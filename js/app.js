@@ -45,14 +45,50 @@ let generatedImageUrl = null;
 // Gallery storage key (for local fallback)
 const GALLERY_STORAGE_KEY = 'up_renouveau_badges_gallery';
 
-// API URL - Change this after deploying to Vercel
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:3000/api/badges'
-    : 'https://badge-up-renouveau.vercel.app/api/badges';
+// Firebase Realtime Database (free tier) for shared gallery
+const FIREBASE_DB_URL = 'https://up-le-renouveau-default-rtdb.europe-west1.firebasedatabase.app';
 
 // Cloudinary config for image storage (free tier: 25GB)
 const CLOUDINARY_CLOUD_NAME = 'dn8ed1doa';
 const CLOUDINARY_UPLOAD_PRESET = 'badge_up_renouveau';
+
+// Fetch badges from Firebase (shared gallery)
+async function fetchBadgesFromCloud() {
+    try {
+        const response = await fetch(`${FIREBASE_DB_URL}/badges.json`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data) {
+                // Convert object to array and sort by date
+                return Object.keys(data).map(key => ({
+                    id: key,
+                    ...data[key]
+                })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            }
+        }
+        return [];
+    } catch (error) {
+        console.error('Error fetching from Firebase:', error);
+        return [];
+    }
+}
+
+// Save badge to Firebase (shared gallery)
+async function saveBadgeToCloud(badgeData) {
+    try {
+        const response = await fetch(`${FIREBASE_DB_URL}/badges.json`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(badgeData)
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Error saving to Firebase:', error);
+        return false;
+    }
+}
 
 // Compress image to reduce storage size
 function compressImage(dataUrl, maxWidth = 540, quality = 0.7) {
@@ -699,13 +735,17 @@ async function loadGalleryPreview() {
     let badges = [];
     
     try {
-        const response = await fetch(API_URL);
-        if (response.ok) {
-            badges = await response.json();
-        }
+        // Fetch from Firebase (shared gallery)
+        badges = await fetchBadgesFromCloud();
     } catch (error) {
-        console.log('API not available');
+        console.log('Firebase not available, using local storage');
         badges = getGalleryData();
+    }
+    
+    // Merge with local badges (if any not synced)
+    const localBadges = getGalleryData().filter(b => b.isLocal);
+    if (localBadges.length > 0) {
+        badges = [...localBadges, ...badges];
     }
     
     // Update counter
@@ -771,13 +811,17 @@ async function loadFullGallery() {
     let badges = [];
     
     try {
-        const response = await fetch(API_URL);
-        if (response.ok) {
-            badges = await response.json();
-        }
+        // Fetch from Firebase (shared gallery)
+        badges = await fetchBadgesFromCloud();
     } catch (error) {
-        console.log('API not available, using local storage');
+        console.log('Firebase not available, using local storage');
         badges = getGalleryData();
+    }
+    
+    // Merge with local badges
+    const localBadges = getGalleryData().filter(b => b.isLocal);
+    if (localBadges.length > 0) {
+        badges = [...localBadges, ...badges];
     }
     
     galleryLoading.classList.add('hidden');
@@ -815,13 +859,13 @@ function saveGalleryData(data) {
     }
 }
 
-// Save badge - Upload to Cloudinary then API/Local
+// Save badge - Upload to Cloudinary then Firebase (shared)
 async function saveBadgeToGallery(imageDataUrl, prenom, nom) {
     try {
         // 1. Compress image for storage (720px, 85% quality = good quality, ~100KB)
         const compressedImage = await compressImage(imageDataUrl, 720, 0.85);
         
-        // 2. Try to upload to Cloudinary for permanent storage
+        // 2. Upload to Cloudinary for permanent storage
         let finalImageUrl = compressedImage;
         const cloudinaryUrl = await uploadToCloudinary(compressedImage);
         if (cloudinaryUrl) {
@@ -829,27 +873,25 @@ async function saveBadgeToGallery(imageDataUrl, prenom, nom) {
             console.log('Image uploaded to Cloudinary:', cloudinaryUrl);
         }
         
-        // 3. Save to API (with Cloudinary URL or compressed base64)
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                prenom,
-                nom,
-                imageUrl: finalImageUrl
-            })
-        });
+        // 3. Save to Firebase (shared gallery)
+        const badgeData = {
+            prenom,
+            nom,
+            imageUrl: finalImageUrl,
+            createdAt: new Date().toISOString()
+        };
         
-        if (response.ok) {
+        const saved = await saveBadgeToCloud(badgeData);
+        
+        if (saved) {
+            console.log('Badge saved to Firebase (shared gallery)');
             loadGalleryPreview();
             return;
         }
-        throw new Error('API error');
+        throw new Error('Firebase error');
     } catch (error) {
-        console.log('API not available, saving to local storage (compressed)');
-        // Fallback: save compressed image locally (smaller for localStorage limits)
+        console.log('Cloud not available, saving to local storage');
+        // Fallback: save compressed image locally
         const compressedImage = await compressImage(imageDataUrl, 540, 0.75);
         saveToLocalGallery(compressedImage, prenom, nom, {
             id: Date.now().toString(),
