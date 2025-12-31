@@ -134,7 +134,7 @@ body {
 .photo-upload {
     position: relative;
     width: 100%;
-    height: 400px;
+    height: 280px;
     border: 2px dashed var(--border-color);
     border-radius: var(--radius-sm);
     cursor: pointer;
@@ -251,7 +251,7 @@ body {
 /* Badge principal - Format carré */
 .badge {
     width: 100%;
-    max-width: 380px;
+    max-width: 450px;
     aspect-ratio: 1 / 1;
     position: relative;
     overflow: hidden;
