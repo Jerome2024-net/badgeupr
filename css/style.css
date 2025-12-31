@@ -248,11 +248,12 @@ body {
     width: 100%;
 }
 
-/* Badge principal - Format carré */
+/* Badge principal - Format carré par défaut, mais adaptable */
 .badge {
     width: 100%;
     max-width: 500px;
-    aspect-ratio: 1 / 1;
+    /* aspect-ratio: 1 / 1;  <-- Supprimé pour laisser le JS gérer le ratio */
+    min-height: 300px; /* Hauteur minimale pour éviter l'écrasement */
     position: relative;
     overflow: hidden;
     background: var(--blanc);

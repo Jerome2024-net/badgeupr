@@ -302,11 +302,19 @@ async function handleFormSubmit(e) {
             // Adapter la taille du badge à celle de la photo
             if (badgePhoto.naturalWidth && badgePhoto.naturalHeight) {
                 const imgRatio = badgePhoto.naturalWidth / badgePhoto.naturalHeight;
+                
+                // Appliquer le ratio
                 badge.style.aspectRatio = `${imgRatio}`;
+                
+                // Forcer le recalcul de la mise en page (Reflow)
+                void badge.offsetWidth; 
             }
             
+            // Ajuster l'image dans la zone (maintenant redimensionnée)
             fitImageToZone();
-            resolve();
+            
+            // Petit délai pour s'assurer que le rendu est prêt avant la génération
+            setTimeout(resolve, 50);
         };
 
         if (badgePhoto.complete) {
