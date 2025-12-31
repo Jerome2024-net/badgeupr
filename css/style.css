@@ -251,7 +251,7 @@ body {
 /* Badge principal - Format carré */
 .badge {
     width: 100%;
-    max-width: 380px;
+    max-width: 500px;
     aspect-ratio: 1 / 1;
     position: relative;
     overflow: hidden;
