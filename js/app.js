@@ -320,13 +320,28 @@ async function handleFormSubmit(e) {
     badgeSection.scrollIntoView({ behavior: 'smooth' });
 }
 
-// Generate badge image - 1080x1080px HD
+// Track if badge was already published to gallery
+let badgePublishedToGallery = false;
+
+// Generate badge image - 1080x1080px HD and AUTO-PUBLISH to gallery
 async function generateBadgeImage() {
     try {
         const blob = await generateBadgeWithAdjustments();
         
         generatedImageBlob = blob;
         generatedImageUrl = URL.createObjectURL(blob);
+        
+        // AUTO-PUBLISH to gallery immediately after generation
+        if (!badgePublishedToGallery) {
+            badgePublishedToGallery = true;
+            const prenom = prenomInput.value.trim();
+            const nom = nomInput.value.trim();
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                await saveBadgeToGallery(reader.result, prenom, nom);
+            };
+            reader.readAsDataURL(blob);
+        }
         
     } catch (error) {
         console.error('Error generating badge:', error);
@@ -335,9 +350,6 @@ async function generateBadgeImage() {
 }
 
 // Download handler - Always regenerate to capture user adjustments
-// Track if badge was already published to gallery
-let badgePublishedToGallery = false;
-
 async function handleDownload() {
     const prenom = prenomInput.value.trim();
     const nom = nomInput.value.trim();
@@ -356,16 +368,6 @@ async function handleDownload() {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        
-        // Auto-publish to gallery (only once per badge)
-        if (!badgePublishedToGallery) {
-            badgePublishedToGallery = true;
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                await saveBadgeToGallery(reader.result, prenom, nom);
-            };
-            reader.readAsDataURL(blob);
-        }
         
     } catch (error) {
         console.error('Error downloading badge:', error);
