@@ -299,22 +299,8 @@ async function handleFormSubmit(e) {
     // Wait for image to load and adjust position
     await new Promise((resolve) => {
         const adjustAndResolve = () => {
-            // Adapter la taille du badge à celle de la photo
-            if (badgePhoto.naturalWidth && badgePhoto.naturalHeight) {
-                const imgRatio = badgePhoto.naturalWidth / badgePhoto.naturalHeight;
-                
-                // Appliquer le ratio
-                badge.style.aspectRatio = `${imgRatio}`;
-                
-                // Forcer le recalcul de la mise en page (Reflow)
-                void badge.offsetWidth; 
-            }
-            
-            // Ajuster l'image dans la zone (maintenant redimensionnée)
             fitImageToZone();
-            
-            // Petit délai pour s'assurer que le rendu est prêt avant la génération
-            setTimeout(resolve, 50);
+            resolve();
         };
 
         if (badgePhoto.complete) {
@@ -391,24 +377,19 @@ async function handleDownload() {
 
 // Generate badge with proper adjustments using manual canvas drawing
 async function generateBadgeWithAdjustments() {
-    const targetWidth = 1080;
-    
-    // Get badge dimensions for aspect ratio calculation
-    const badgeRect = badge.getBoundingClientRect();
-    const aspect = badgeRect.width / badgeRect.height;
-    const targetHeight = targetWidth / aspect;
-
+    const targetSize = 1080;
     const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
+    canvas.width = targetSize;
+    canvas.height = targetSize;
     const ctx = canvas.getContext('2d');
     
-    // Scale factor based on width
-    const scaleFactor = targetWidth / badgeRect.width;
+    // Get badge dimensions for scale calculation
+    const badgeRect = badge.getBoundingClientRect();
+    const scaleFactor = targetSize / badgeRect.width;
     
     // 1. Draw white background
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, targetWidth, targetHeight);
+    ctx.fillRect(0, 0, targetSize, targetSize);
     
     // 2. Draw user photo with adjustments
     if (badgePhoto.src && badgePhoto.complete) {
@@ -440,7 +421,7 @@ async function generateBadgeWithAdjustments() {
     // 3. Draw the frame overlay
     const frameImg = document.querySelector('.badge-frame');
     if (frameImg && frameImg.complete) {
-        ctx.drawImage(frameImg, 0, 0, targetWidth, targetHeight);
+        ctx.drawImage(frameImg, 0, 0, targetSize, targetSize);
     }
     
     // 4. Draw the text
@@ -470,7 +451,7 @@ async function generateBadgeWithAdjustments() {
             ctx.shadowOffsetX = 2 * scaleFactor;
             ctx.shadowOffsetY = 2 * scaleFactor;
             
-            ctx.fillText(`Je suis ${textContent}`, targetWidth / 2, textY);
+            ctx.fillText(`Je suis ${textContent}`, targetSize / 2, textY);
         }
     }
     
