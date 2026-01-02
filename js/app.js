@@ -323,7 +323,7 @@ async function handleFormSubmit(e) {
 // Track if badge was already published to gallery
 let badgePublishedToGallery = false;
 
-// Generate badge image - 1080x1080px HD and AUTO-PUBLISH to gallery
+// Generate badge image - 1080x1080px HD
 async function generateBadgeImage() {
     try {
         const blob = await generateBadgeWithAdjustments();
@@ -331,21 +331,29 @@ async function generateBadgeImage() {
         generatedImageBlob = blob;
         generatedImageUrl = URL.createObjectURL(blob);
         
-        // AUTO-PUBLISH to gallery immediately after generation
-        if (!badgePublishedToGallery) {
-            badgePublishedToGallery = true;
-            const prenom = prenomInput.value.trim();
-            const nom = nomInput.value.trim();
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                await saveBadgeToGallery(reader.result, prenom, nom);
-            };
-            reader.readAsDataURL(blob);
-        }
+        // NOTE: Auto-publish removed from here. 
+        // It will be triggered on Download or Share.
         
     } catch (error) {
         console.error('Error generating badge:', error);
         alert('Une erreur est survenue lors de la génération du badge.');
+    }
+}
+
+// Helper to publish to gallery if not already done
+async function publishToGallery(blob) {
+    if (!badgePublishedToGallery) {
+        badgePublishedToGallery = true;
+        const prenom = prenomInput.value.trim();
+        const nom = nomInput.value.trim();
+        
+        // Convert blob to base64 for upload
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            // This function handles Cloudinary upload + Firebase save
+            await saveBadgeToGallery(reader.result, prenom, nom);
+        };
+        reader.readAsDataURL(blob);
     }
 }
 
@@ -358,6 +366,9 @@ async function handleDownload() {
     try {
         // Generate HIGH QUALITY image (1080px PNG)
         const blob = await generateBadgeWithAdjustments();
+        
+        // Publish to gallery NOW (on download)
+        publishToGallery(blob);
         
         // Download the HIGH QUALITY image
         const url = URL.createObjectURL(blob);
@@ -477,6 +488,9 @@ async function handleWhatsAppShare() {
     try {
         const blob = await generateBadgeWithAdjustments();
         
+        // Publish to gallery NOW (on share)
+        publishToGallery(blob);
+        
         // Try Web Share API first (mobile)
         if (navigator.canShare) {
             const file = new File([blob], `badge_UP_${prenom}_${nom}.png`, { type: 'image/png' });
@@ -514,6 +528,9 @@ async function handleFacebookShare() {
     // Regenerate image with adjustments
     try {
         const blob = await generateBadgeWithAdjustments();
+        
+        // Publish to gallery NOW (on share)
+        publishToGallery(blob);
         
         // Try Web Share API first (mobile)
         if (navigator.canShare) {
