@@ -319,6 +319,12 @@ async function handleFormSubmit(e) {
     // Generate image
     await generateBadgeImage();
     
+    // Hide download/share buttons initially
+    downloadBtn.style.display = 'none';
+    shareWhatsApp.style.display = 'none';
+    shareFacebook.style.display = 'none';
+    if (publishBtn) publishBtn.style.display = 'block';
+
     // Hide loading
     hideLoading();
     
@@ -386,7 +392,16 @@ async function handlePublish() {
         const blob = await generateBadgeWithAdjustments();
         await publishToGallery(blob);
         hideLoading();
-        alert('✅ Votre badge a été validé et publié dans la galerie avec succès !');
+        
+        // Show download/share buttons after successful publish
+        downloadBtn.style.display = 'flex';
+        shareWhatsApp.style.display = 'flex';
+        shareFacebook.style.display = 'flex';
+        
+        // Hide publish button
+        if (publishBtn) publishBtn.style.display = 'none';
+
+        alert('✅ Votre badge a été validé et publié dans la galerie avec succès ! Vous pouvez maintenant le télécharger et le partager.');
     } catch (error) {
         hideLoading();
         console.error('Error publishing badge:', error);
@@ -622,6 +637,12 @@ function resetForm() {
     formSection.style.display = '';
     badgeSection.style.display = 'none';
     
+    // Reset buttons visibility
+    downloadBtn.style.display = '';
+    shareWhatsApp.style.display = '';
+    shareFacebook.style.display = '';
+    if (publishBtn) publishBtn.style.display = '';
+
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
