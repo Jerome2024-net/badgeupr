@@ -15,6 +15,7 @@ const badgeSection = document.getElementById('badgeSection');
 const badgePhoto = document.getElementById('badgePhoto');
 const badgeName = document.getElementById('badgeName');
 const badge = document.getElementById('badge');
+const publishBtn = document.getElementById('publishBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 const shareWhatsApp = document.getElementById('shareWhatsApp');
 const shareFacebook = document.getElementById('shareFacebook');
@@ -171,6 +172,11 @@ function setupEventListeners() {
     // Form submission
     badgeForm.addEventListener('submit', handleFormSubmit);
     
+    // Publish button
+    if (publishBtn) {
+        publishBtn.addEventListener('click', handlePublish);
+    }
+
     // Download button
     downloadBtn.addEventListener('click', handleDownload);
     
@@ -341,19 +347,50 @@ async function generateBadgeImage() {
 }
 
 // Helper to publish to gallery if not already done
-async function publishToGallery(blob) {
-    if (!badgePublishedToGallery) {
-        badgePublishedToGallery = true;
+function publishToGallery(blob) {
+    return new Promise((resolve, reject) => {
+        if (badgePublishedToGallery) {
+            resolve(true); // Already published
+            return;
+        }
+
         const prenom = prenomInput.value.trim();
         const nom = nomInput.value.trim();
         
         // Convert blob to base64 for upload
         const reader = new FileReader();
         reader.onloadend = async () => {
-            // This function handles Cloudinary upload + Firebase save
-            await saveBadgeToGallery(reader.result, prenom, nom);
+            try {
+                // This function handles Cloudinary upload + Firebase save
+                await saveBadgeToGallery(reader.result, prenom, nom);
+                badgePublishedToGallery = true;
+                resolve(true);
+            } catch (error) {
+                reject(error);
+            }
         };
+        reader.onerror = reject;
         reader.readAsDataURL(blob);
+    });
+}
+
+// Manual publish handler
+async function handlePublish() {
+    if (badgePublishedToGallery) {
+        alert('Votre badge est déjà publié dans la galerie !');
+        return;
+    }
+
+    try {
+        showLoading();
+        const blob = await generateBadgeWithAdjustments();
+        await publishToGallery(blob);
+        hideLoading();
+        alert('✅ Votre badge a été validé et publié dans la galerie avec succès !');
+    } catch (error) {
+        hideLoading();
+        console.error('Error publishing badge:', error);
+        alert('Erreur lors de la publication.');
     }
 }
 
