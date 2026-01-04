@@ -558,9 +558,8 @@ const FIREBASE_DB_URL = 'https://up-le-renouveau-default-rtdb.europe-west1.fireb
 // Fetch badges from Firebase (Optimized)
 async function fetchBadges() {
     try {
-        // Optimization: Fetch only the last 50 items using orderBy="$key" (chronological)
-        // This prevents loading the entire database
-        const response = await fetch(`${FIREBASE_DB_URL}/badges.json?orderBy="$key"&limitToLast=50`);
+        // Fetch all badges (limit increased to 5000 to accommodate large volume)
+        const response = await fetch(`${FIREBASE_DB_URL}/badges.json?orderBy="$key"&limitToLast=5000`);
         
         if (response.ok) {
             const data = await response.json();
@@ -749,10 +748,30 @@ async function loadFullGallery() {
         return;
     }
     
-    badges.forEach(badge => {
-        const item = createGalleryItem(badge);
-        galleryGrid.appendChild(item);
-    });
+    // Render in chunks to prevent UI freeze
+    const CHUNK_SIZE = 50;
+    let currentIndex = 0;
+    
+    function renderChunk() {
+        const chunk = badges.slice(currentIndex, currentIndex + CHUNK_SIZE);
+        if (chunk.length === 0) return;
+        
+        const fragment = document.createDocumentFragment();
+        chunk.forEach(badge => {
+            const item = createGalleryItem(badge);
+            fragment.appendChild(item);
+        });
+        
+        galleryGrid.appendChild(fragment);
+        currentIndex += CHUNK_SIZE;
+        
+        if (currentIndex < badges.length) {
+            // Schedule next chunk
+            requestAnimationFrame(renderChunk);
+        }
+    }
+    
+    renderChunk();
 }
 
 function createGalleryItem(badge) {
