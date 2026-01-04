@@ -556,10 +556,10 @@ function fitImageToZone() {
 const FIREBASE_DB_URL = 'https://up-le-renouveau-default-rtdb.europe-west1.firebasedatabase.app';
 
 // Fetch badges from Firebase (Optimized)
-async function fetchBadges() {
+async function fetchBadges(limit = 50) {
     try {
-        // Fetch all badges (limit increased to 5000 to accommodate large volume)
-        const response = await fetch(`${FIREBASE_DB_URL}/badges.json?orderBy="$key"&limitToLast=5000`);
+        // Fetch badges with dynamic limit
+        const response = await fetch(`${FIREBASE_DB_URL}/badges.json?orderBy="$key"&limitToLast=${limit}`);
         
         if (response.ok) {
             const data = await response.json();
@@ -679,11 +679,15 @@ function compressImage(dataUrl, maxWidth = 540, quality = 0.7) {
 
 // Load preview badges
 async function loadGalleryPreview() {
-    const badges = await fetchBadges();
+    // Fetch only 20 badges for preview to be fast
+    const badges = await fetchBadges(20);
     
-    // Update counter
-    const count = badges.length;
-    badgeCounter.textContent = `${count} supporter${count > 1 ? 's' : ''}`;
+    // Update counter (approximate or just show "Many")
+    // Note: We can't get the total count easily without fetching all keys, 
+    // so we'll just show "Supporters" or keep the count of fetched items for now.
+    // Or we can fetch a separate counter if available.
+    // For now, let's just show "Derniers supporters"
+    badgeCounter.textContent = `Derniers supporters`;
     
     // Clear and populate preview
     galleryPreviewScroll.innerHTML = '';
@@ -696,8 +700,8 @@ async function loadGalleryPreview() {
     
     galleryPreviewEmpty.classList.add('hidden');
     
-    // Show first 10 badges
-    badges.slice(0, 10).forEach(badge => {
+    // Show badges
+    badges.forEach(badge => {
         const item = createPreviewItem(badge);
         galleryPreviewScroll.appendChild(item);
     });
@@ -738,7 +742,8 @@ async function loadFullGallery() {
     galleryLoading.classList.remove('hidden');
     galleryEmpty.classList.remove('visible');
     
-    const badges = await fetchBadges();
+    // Fetch up to 5000 badges to ensure we get all 2000+
+    const badges = await fetchBadges(5000);
     
     galleryLoading.classList.add('hidden');
     galleryBadgeCount.textContent = `${badges.length} badge${badges.length > 1 ? 's' : ''}`;
