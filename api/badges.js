@@ -24,6 +24,11 @@ module.exports = async function handler(req, res) {
         res.setHeader(key, headers[key]);
     });
 
+    // Disable caching for dynamic content
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     try {
         if (req.method === 'GET') {
             // Get all badges

@@ -15,7 +15,6 @@ const badgeSection = document.getElementById('badgeSection');
 const badgePhoto = document.getElementById('badgePhoto');
 const badgeName = document.getElementById('badgeName');
 const badge = document.getElementById('badge');
-const publishBtn = document.getElementById('publishBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 const shareWhatsApp = document.getElementById('shareWhatsApp');
 const shareFacebook = document.getElementById('shareFacebook');
@@ -38,109 +37,15 @@ const galleryGrid = document.getElementById('galleryGrid');
 const galleryEmpty = document.getElementById('galleryEmpty');
 const galleryLoading = document.getElementById('galleryLoading');
 const galleryBadgeCount = document.getElementById('galleryBadgeCount');
+const publishBtn = document.getElementById('publishBtn');
 
 // Store the generated image
 let generatedImageBlob = null;
 let generatedImageUrl = null;
 
-// Gallery storage key (for local fallback)
-const GALLERY_STORAGE_KEY = 'up_renouveau_badges_gallery';
-
-// Firebase Realtime Database (free tier) for shared gallery
-const FIREBASE_DB_URL = 'https://up-le-renouveau-default-rtdb.europe-west1.firebasedatabase.app';
-
-// Cloudinary config for image storage (free tier: 25GB)
+// Cloudinary config
 const CLOUDINARY_CLOUD_NAME = 'dn8ed1doa';
 const CLOUDINARY_UPLOAD_PRESET = 'badge_up_renouveau';
-
-// Fetch badges from Firebase (shared gallery)
-async function fetchBadgesFromCloud() {
-    try {
-        const response = await fetch(`${FIREBASE_DB_URL}/badges.json`);
-        if (response.ok) {
-            const data = await response.json();
-            if (data) {
-                // Convert object to array and sort by date
-                return Object.keys(data).map(key => ({
-                    id: key,
-                    ...data[key]
-                })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            }
-        }
-        return [];
-    } catch (error) {
-        console.error('Error fetching from Firebase:', error);
-        return [];
-    }
-}
-
-// Save badge to Firebase (shared gallery)
-async function saveBadgeToCloud(badgeData) {
-    try {
-        const response = await fetch(`${FIREBASE_DB_URL}/badges.json`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(badgeData)
-        });
-        return response.ok;
-    } catch (error) {
-        console.error('Error saving to Firebase:', error);
-        return false;
-    }
-}
-
-// Compress image to reduce storage size
-function compressImage(dataUrl, maxWidth = 540, quality = 0.7) {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ratio = maxWidth / img.width;
-            canvas.width = maxWidth;
-            canvas.height = img.height * ratio;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            
-            resolve(canvas.toDataURL('image/jpeg', quality));
-        };
-        img.src = dataUrl;
-    });
-}
-
-// Upload image to Cloudinary
-async function uploadToCloudinary(imageDataUrl) {
-    try {
-        const formData = new FormData();
-        
-        // Convert base64 to blob
-        const response = await fetch(imageDataUrl);
-        const blob = await response.blob();
-        
-        formData.append('file', blob);
-        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-        formData.append('folder', 'badges_up_renouveau');
-        
-        const uploadResponse = await fetch(
-            `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-            {
-                method: 'POST',
-                body: formData
-            }
-        );
-        
-        if (uploadResponse.ok) {
-            const data = await uploadResponse.json();
-            return data.secure_url; // URL Cloudinary de l'image
-        }
-        throw new Error('Upload failed');
-    } catch (error) {
-        console.error('Cloudinary upload error:', error);
-        return null;
-    }
-}
 
 // Image adjustment state
 let currentScale = 1;
@@ -172,11 +77,6 @@ function setupEventListeners() {
     // Form submission
     badgeForm.addEventListener('submit', handleFormSubmit);
     
-    // Publish button
-    if (publishBtn) {
-        publishBtn.addEventListener('click', handlePublish);
-    }
-
     // Download button
     downloadBtn.addEventListener('click', handleDownload);
     
@@ -187,16 +87,19 @@ function setupEventListeners() {
     // New badge button
     newBadgeBtn.addEventListener('click', resetForm);
     
+    // Publish button
+    if (publishBtn) {
+        publishBtn.addEventListener('click', handlePublish);
+    }
+
+    // Gallery events
+    seeAllBadgesBtn.addEventListener('click', openFullGallery);
+    closeGalleryBtn.addEventListener('click', closeFullGallery);
+
     // Drag and drop support
     photoUpload.addEventListener('dragover', handleDragOver);
     photoUpload.addEventListener('dragleave', handleDragLeave);
     photoUpload.addEventListener('drop', handleDrop);
-    
-    // Gallery events
-    seeAllBadgesBtn.addEventListener('click', openFullGallery);
-    closeGalleryBtn.addEventListener('click', closeFullGallery);
-    // Publication automatique - plus besoin du bouton
-    // document.getElementById('publishToGallery').addEventListener('click', handlePublishToGallery);
 }
 
 // Photo handling
@@ -324,7 +227,7 @@ async function handleFormSubmit(e) {
     shareWhatsApp.style.display = 'none';
     shareFacebook.style.display = 'none';
     if (publishBtn) publishBtn.style.display = 'block';
-
+    
     // Hide loading
     hideLoading();
     
@@ -332,199 +235,67 @@ async function handleFormSubmit(e) {
     badgeSection.scrollIntoView({ behavior: 'smooth' });
 }
 
-// Track if badge was already published to gallery
-let badgePublishedToGallery = false;
-
-// Generate badge image - 1080x1080px HD
+// Generate badge image using html2canvas - 1080x1080px HD
 async function generateBadgeImage() {
     try {
-        const blob = await generateBadgeWithAdjustments();
+        // Calculate scale to get 1080px output
+        const badgeWidth = badge.offsetWidth;
+        const targetSize = 1080;
+        const scale = targetSize / badgeWidth;
         
-        generatedImageBlob = blob;
-        generatedImageUrl = URL.createObjectURL(blob);
+        const canvas = await html2canvas(badge, {
+            scale: scale,
+            useCORS: true,
+            backgroundColor: null,
+            logging: false,
+            width: badgeWidth,
+            height: badgeWidth // Square format
+        });
         
-        // NOTE: Auto-publish removed from here. 
-        // It will be triggered on Download or Share.
+        // Convert to blob and wait for it
+        return new Promise((resolve) => {
+            canvas.toBlob((blob) => {
+                generatedImageBlob = blob;
+                if (generatedImageUrl) {
+                    URL.revokeObjectURL(generatedImageUrl);
+                }
+                generatedImageUrl = URL.createObjectURL(blob);
+                resolve(blob);
+            }, 'image/png', 1.0);
+        });
         
     } catch (error) {
         console.error('Error generating badge:', error);
         alert('Une erreur est survenue lors de la génération du badge.');
+        return null;
     }
 }
 
-// Helper to publish to gallery if not already done
-function publishToGallery(blob) {
-    return new Promise((resolve, reject) => {
-        if (badgePublishedToGallery) {
-            resolve(true); // Already published
-            return;
-        }
-
-        const prenom = prenomInput.value.trim();
-        const nom = nomInput.value.trim();
-        
-        // Convert blob to base64 for upload
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-            try {
-                // This function handles Cloudinary upload + Firebase save
-                await saveBadgeToGallery(reader.result, prenom, nom);
-                badgePublishedToGallery = true;
-                resolve(true);
-            } catch (error) {
-                reject(error);
-            }
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-// Manual publish handler
-async function handlePublish() {
-    if (badgePublishedToGallery) {
-        alert('Votre badge est déjà publié dans la galerie !');
+// Download handler
+async function handleDownload() {
+    if (!generatedImageBlob) {
+        await generateBadgeImage();
+    }
+    
+    if (!generatedImageUrl) {
+        alert('Impossible de générer le badge. Veuillez réessayer.');
         return;
     }
-
-    try {
-        showLoading();
-        const blob = await generateBadgeWithAdjustments();
-        await publishToGallery(blob);
-        hideLoading();
-        
-        // Show download/share buttons after successful publish
-        downloadBtn.style.display = 'flex';
-        shareWhatsApp.style.display = 'flex';
-        shareFacebook.style.display = 'flex';
-        
-        // Hide publish button
-        if (publishBtn) publishBtn.style.display = 'none';
-
-        alert('✅ Votre badge a été validé et publié dans la galerie avec succès ! Vous pouvez maintenant le télécharger et le partager.');
-    } catch (error) {
-        hideLoading();
-        console.error('Error publishing badge:', error);
-        alert('Erreur lors de la publication.');
-    }
-}
-
-// Download handler - Always regenerate to capture user adjustments
-async function handleDownload() {
+    
     const prenom = prenomInput.value.trim();
     const nom = nomInput.value.trim();
     const filename = `badge_UP_${prenom}_${nom}.png`.replace(/\s+/g, '_');
     
-    try {
-        // Generate HIGH QUALITY image (1080px PNG)
-        const blob = await generateBadgeWithAdjustments();
-        
-        // Publish to gallery NOW (on download)
-        publishToGallery(blob);
-        
-        // Download the HIGH QUALITY image
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-    } catch (error) {
-        console.error('Error downloading badge:', error);
-        alert('Une erreur est survenue lors du téléchargement.');
-    }
+    // Create download link
+    const link = document.createElement('a');
+    link.href = generatedImageUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
-// Generate badge with proper adjustments using manual canvas drawing
-async function generateBadgeWithAdjustments() {
-    const targetSize = 1080;
-    const canvas = document.createElement('canvas');
-    canvas.width = targetSize;
-    canvas.height = targetSize;
-    const ctx = canvas.getContext('2d');
-    
-    // Get badge dimensions for scale calculation
-    const badgeRect = badge.getBoundingClientRect();
-    const scaleFactor = targetSize / badgeRect.width;
-    
-    // 1. Draw white background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, targetSize, targetSize);
-    
-    // 2. Draw user photo with adjustments
-    if (badgePhoto.src && badgePhoto.complete) {
-        const photoZoneRect = badgePhotoZone.getBoundingClientRect();
-        const photoRect = badgePhoto.getBoundingClientRect();
-        
-        // Calculate photo position relative to badge
-        const photoRelativeX = (photoRect.left - badgeRect.left) * scaleFactor;
-        const photoRelativeY = (photoRect.top - badgeRect.top) * scaleFactor;
-        const photoWidth = photoRect.width * scaleFactor;
-        const photoHeight = photoRect.height * scaleFactor;
-        
-        // Create clipping region for the photo zone
-        const zoneX = (photoZoneRect.left - badgeRect.left) * scaleFactor;
-        const zoneY = (photoZoneRect.top - badgeRect.top) * scaleFactor;
-        const zoneWidth = photoZoneRect.width * scaleFactor;
-        const zoneHeight = photoZoneRect.height * scaleFactor;
-        
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(zoneX, zoneY, zoneWidth, zoneHeight);
-        ctx.clip();
-        
-        // Draw the photo at its current visual position
-        ctx.drawImage(badgePhoto, photoRelativeX, photoRelativeY, photoWidth, photoHeight);
-        ctx.restore();
-    }
-    
-    // 3. Draw the frame overlay
-    const frameImg = document.querySelector('.badge-frame');
-    if (frameImg && frameImg.complete) {
-        ctx.drawImage(frameImg, 0, 0, targetSize, targetSize);
-    }
-    
-    // 4. Draw the text
-    const textContent = badgeName.textContent;
-    if (textContent) {
-        const textOverlay = document.querySelector('.badge-text-overlay');
-        const textElement = document.querySelector('.badge-dynamic-text');
-        
-        if (textOverlay && textElement) {
-            const textRect = textOverlay.getBoundingClientRect();
-            const textY = (textRect.top - badgeRect.top + textRect.height / 2) * scaleFactor;
-            
-            // Get computed styles
-            const computedStyle = window.getComputedStyle(textElement);
-            const fontSize = parseFloat(computedStyle.fontSize) * scaleFactor;
-            const fontFamily = computedStyle.fontFamily;
-            const color = computedStyle.color;
-            
-            ctx.font = `700 ${fontSize}px ${fontFamily}`;
-            ctx.fillStyle = color;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            // Draw text with shadow for better visibility
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            ctx.shadowBlur = 4 * scaleFactor;
-            ctx.shadowOffsetX = 2 * scaleFactor;
-            ctx.shadowOffsetY = 2 * scaleFactor;
-            
-            ctx.fillText(`Je suis ${textContent}`, targetSize / 2, textY);
-        }
-    }
-    
-    // Convert to blob
-    return new Promise(resolve => {
-        canvas.toBlob(resolve, 'image/png', 1.0);
-    });
-}
-
-// WhatsApp share handler - Regenerate to capture adjustments
+// WhatsApp share handler
 async function handleWhatsAppShare() {
     const prenom = prenomInput.value.trim();
     const nom = nomInput.value.trim();
@@ -536,16 +307,10 @@ async function handleWhatsAppShare() {
 
 #UPLeRenouveau #JeMaintiensLeCap #Elections2025 #Benin`;
     
-    // Regenerate image with adjustments
-    try {
-        const blob = await generateBadgeWithAdjustments();
-        
-        // Publish to gallery NOW (on share)
-        publishToGallery(blob);
-        
-        // Try Web Share API first (mobile)
-        if (navigator.canShare) {
-            const file = new File([blob], `badge_UP_${prenom}_${nom}.png`, { type: 'image/png' });
+    // Try Web Share API first (mobile)
+    if (navigator.canShare && generatedImageBlob) {
+        try {
+            const file = new File([generatedImageBlob], `badge_UP_${prenom}_${nom}.png`, { type: 'image/png' });
             
             if (navigator.canShare({ files: [file] })) {
                 await navigator.share({
@@ -555,9 +320,9 @@ async function handleWhatsAppShare() {
                 });
                 return;
             }
+        } catch (error) {
+            console.log('Web Share failed, using WhatsApp URL');
         }
-    } catch (error) {
-        console.log('Web Share failed, using WhatsApp URL');
     }
     
     // Fallback: Open WhatsApp with message
@@ -565,7 +330,7 @@ async function handleWhatsAppShare() {
     window.open(whatsappUrl, '_blank');
 }
 
-// Facebook share handler - Regenerate to capture adjustments
+// Facebook share handler
 async function handleFacebookShare() {
     const prenom = prenomInput.value.trim();
     const nom = nomInput.value.trim();
@@ -577,16 +342,10 @@ async function handleFacebookShare() {
 
 #UPLeRenouveau #JeMaintiensLeCap #Elections2025`;
     
-    // Regenerate image with adjustments
-    try {
-        const blob = await generateBadgeWithAdjustments();
-        
-        // Publish to gallery NOW (on share)
-        publishToGallery(blob);
-        
-        // Try Web Share API first (mobile)
-        if (navigator.canShare) {
-            const file = new File([blob], `badge_UP_${prenom}_${nom}.png`, { type: 'image/png' });
+    // Try Web Share API first (mobile)
+    if (navigator.canShare && generatedImageBlob) {
+        try {
+            const file = new File([generatedImageBlob], `badge_UP_${prenom}_${nom}.png`, { type: 'image/png' });
             
             if (navigator.canShare({ files: [file] })) {
                 await navigator.share({
@@ -596,9 +355,9 @@ async function handleFacebookShare() {
                 });
                 return;
             }
+        } catch (error) {
+            console.log('Web Share failed, using Facebook URL');
         }
-    } catch (error) {
-        console.log('Web Share failed, using Facebook URL');
     }
     
     // Fallback: Open Facebook share dialog
@@ -618,9 +377,6 @@ function resetForm() {
     // Reset form fields
     badgeForm.reset();
     
-    // Reset gallery publish flag
-    badgePublishedToGallery = false;
-    
     // Reset photo preview
     photoPreview.src = '';
     photoPreview.classList.remove('active');
@@ -637,12 +393,6 @@ function resetForm() {
     formSection.style.display = '';
     badgeSection.style.display = 'none';
     
-    // Reset buttons visibility
-    downloadBtn.style.display = '';
-    shareWhatsApp.style.display = '';
-    shareFacebook.style.display = '';
-    if (publishBtn) publishBtn.style.display = '';
-
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -795,35 +545,142 @@ function fitImageToZone() {
         // Image is taller than zone: fit width
         badgePhoto.style.width = '100%';
         badgePhoto.style.height = 'auto';
-        
-        // Optional: Adjust Y to show face (top part) for portrait images
-        // Since flex centers it, the top is cut off.
-        // To show the top, we would need to translate Y positive.
-        // For now, we leave it centered as the user can drag it.
     }
 }
 
-// =====================
-// GALLERY FUNCTIONS
-// =====================
+// ==========================================
+// API & CLOUDINARY FUNCTIONS
+// ==========================================
 
-// Load preview badges on home page
-async function loadGalleryPreview() {
-    let badges = [];
-    
+// Firebase Configuration
+const FIREBASE_DB_URL = 'https://up-le-renouveau-default-rtdb.europe-west1.firebasedatabase.app';
+
+// Fetch badges from Firebase (Optimized)
+async function fetchBadges() {
     try {
-        // Fetch from Firebase (shared gallery)
-        badges = await fetchBadgesFromCloud();
+        // Optimization: Fetch only the last 50 items using orderBy="$key" (chronological)
+        // This prevents loading the entire database
+        const response = await fetch(`${FIREBASE_DB_URL}/badges.json?orderBy="$key"&limitToLast=50`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (!data) return [];
+            
+            // Convert object to array and reverse (newest first)
+            return Object.keys(data)
+                .map(key => ({
+                    id: key,
+                    ...data[key]
+                }))
+                .reverse();
+        }
+        return [];
     } catch (error) {
-        console.log('Firebase not available, using local storage');
-        badges = getGalleryData();
+        console.error('Error fetching badges:', error);
+        return [];
     }
-    
-    // Merge with local badges (if any not synced)
-    const localBadges = getGalleryData().filter(b => b.isLocal);
-    if (localBadges.length > 0) {
-        badges = [...localBadges, ...badges];
+}
+
+// Upload image to Cloudinary
+async function uploadToCloudinary(imageDataUrl) {
+    try {
+        const formData = new FormData();
+        
+        // Convert base64 to blob
+        const response = await fetch(imageDataUrl);
+        const blob = await response.blob();
+        
+        formData.append('file', blob);
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+        formData.append('folder', 'badges_up_renouveau');
+        
+        const uploadResponse = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+            {
+                method: 'POST',
+                body: formData
+            }
+        );
+        
+        if (uploadResponse.ok) {
+            const data = await uploadResponse.json();
+            return data.secure_url;
+        }
+        throw new Error('Upload failed');
+    } catch (error) {
+        console.error('Cloudinary upload error:', error);
+        return null;
     }
+}
+
+// Save badge to Firebase
+async function saveBadgeToGallery(imageDataUrl, prenom, nom) {
+    try {
+        // 1. Compress image for storage (720px, 85% quality)
+        const compressedImage = await compressImage(imageDataUrl, 720, 0.85);
+        
+        // 2. Upload to Cloudinary
+        const cloudinaryUrl = await uploadToCloudinary(compressedImage);
+        if (!cloudinaryUrl) throw new Error('Cloudinary upload failed');
+        
+        // 3. Save to Firebase
+        const response = await fetch(`${FIREBASE_DB_URL}/badges.json`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                prenom,
+                nom,
+                imageUrl: cloudinaryUrl,
+                createdAt: new Date().toISOString()
+            })
+        });
+        
+        if (!response.ok) throw new Error('Firebase save failed');
+        
+        // Refresh gallery
+        loadGalleryPreview();
+        return true;
+    } catch (error) {
+        console.error('Error saving badge:', error);
+        throw error;
+    }
+}
+
+// Compress image
+function compressImage(dataUrl, maxWidth = 540, quality = 0.7) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.src = dataUrl;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > maxWidth) {
+                height = (height * maxWidth) / width;
+                width = maxWidth;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+    });
+}
+
+// ==========================================
+// GALLERY UI FUNCTIONS
+// ==========================================
+
+// Load preview badges
+async function loadGalleryPreview() {
+    const badges = await fetchBadges();
     
     // Update counter
     const count = badges.length;
@@ -840,7 +697,7 @@ async function loadGalleryPreview() {
     
     galleryPreviewEmpty.classList.add('hidden');
     
-    // Show first 10 badges in preview
+    // Show first 10 badges
     badges.slice(0, 10).forEach(badge => {
         const item = createPreviewItem(badge);
         galleryPreviewScroll.appendChild(item);
@@ -851,16 +708,13 @@ function createPreviewItem(badge) {
     const item = document.createElement('div');
     item.className = 'gallery-preview-item';
     
-    const thumbnailSrc = badge.thumbnailUrl || badge.thumbnail || badge.imageUrl;
-    const fullImageSrc = badge.imageUrl || badge.fullImage;
-    
     item.innerHTML = `
-        <img src="${thumbnailSrc}" alt="${badge.prenom}" loading="lazy">
+        <img src="${badge.imageUrl}" alt="${badge.prenom}" loading="lazy">
         <span class="preview-name">${badge.prenom}</span>
     `;
     
     item.addEventListener('click', () => {
-        openGalleryModal({...badge, fullImage: fullImageSrc});
+        openGalleryModal(badge);
     });
     
     return item;
@@ -879,27 +733,13 @@ function closeFullGallery() {
     document.body.style.overflow = '';
 }
 
-// Load full gallery
+// Load full gallery content
 async function loadFullGallery() {
     galleryGrid.innerHTML = '';
     galleryLoading.classList.remove('hidden');
     galleryEmpty.classList.remove('visible');
     
-    let badges = [];
-    
-    try {
-        // Fetch from Firebase (shared gallery)
-        badges = await fetchBadgesFromCloud();
-    } catch (error) {
-        console.log('Firebase not available, using local storage');
-        badges = getGalleryData();
-    }
-    
-    // Merge with local badges
-    const localBadges = getGalleryData().filter(b => b.isLocal);
-    if (localBadges.length > 0) {
-        badges = [...localBadges, ...badges];
-    }
+    const badges = await fetchBadges();
     
     galleryLoading.classList.add('hidden');
     galleryBadgeCount.textContent = `${badges.length} badge${badges.length > 1 ? 's' : ''}`;
@@ -915,107 +755,19 @@ async function loadFullGallery() {
     });
 }
 
-function getGalleryData() {
-    try {
-        const data = localStorage.getItem(GALLERY_STORAGE_KEY);
-        return data ? JSON.parse(data) : [];
-    } catch (error) {
-        console.error('Error reading gallery data:', error);
-        return [];
-    }
-}
-
-function saveGalleryData(data) {
-    try {
-        localStorage.setItem(GALLERY_STORAGE_KEY, JSON.stringify(data));
-    } catch (error) {
-        console.error('Error saving gallery data:', error);
-        if (error.name === 'QuotaExceededError') {
-            alert('Espace de stockage insuffisant. Supprimez quelques badges de la galerie.');
-        }
-    }
-}
-
-// Save badge - Upload to Cloudinary then Firebase (shared)
-async function saveBadgeToGallery(imageDataUrl, prenom, nom) {
-    try {
-        // 1. Compress image for storage (720px, 85% quality = good quality, ~100KB)
-        const compressedImage = await compressImage(imageDataUrl, 720, 0.85);
-        
-        // 2. Upload to Cloudinary for permanent storage
-        let finalImageUrl = compressedImage;
-        const cloudinaryUrl = await uploadToCloudinary(compressedImage);
-        if (cloudinaryUrl) {
-            finalImageUrl = cloudinaryUrl;
-            console.log('Image uploaded to Cloudinary:', cloudinaryUrl);
-        }
-        
-        // 3. Save to Firebase (shared gallery)
-        const badgeData = {
-            prenom,
-            nom,
-            imageUrl: finalImageUrl,
-            createdAt: new Date().toISOString()
-        };
-        
-        const saved = await saveBadgeToCloud(badgeData);
-        
-        if (saved) {
-            console.log('Badge saved to Firebase (shared gallery)');
-            loadGalleryPreview();
-            return;
-        }
-        throw new Error('Firebase error');
-    } catch (error) {
-        console.log('Cloud not available, saving to local storage');
-        // Fallback: save compressed image locally
-        const compressedImage = await compressImage(imageDataUrl, 540, 0.75);
-        saveToLocalGallery(compressedImage, prenom, nom, {
-            id: Date.now().toString(),
-            prenom,
-            nom,
-            date: new Date().toISOString()
-        });
-        loadGalleryPreview();
-    }
-}
-
-function saveToLocalGallery(imageDataUrl, prenom, nom, badgeData) {
-    const gallery = getGalleryData();
-    
-    const localBadgeData = {
-        ...badgeData,
-        imageUrl: imageDataUrl,
-        isLocal: true
-    };
-    
-    gallery.unshift(localBadgeData);
-    
-    // Limit to 10 badges locally to save storage space
-    if (gallery.length > 10) {
-        gallery.pop();
-    }
-    
-    saveGalleryData(gallery);
-}
-
 function createGalleryItem(badge) {
     const item = document.createElement('div');
     item.className = 'gallery-item';
-    item.dataset.id = badge.id;
     
-    const date = new Date(badge.createdAt || badge.date);
+    const date = new Date(badge.createdAt);
     const formattedDate = date.toLocaleDateString('fr-FR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
     });
     
-    const thumbnailSrc = badge.thumbnailUrl || badge.thumbnail || badge.imageUrl;
-    const fullImageSrc = badge.imageUrl || badge.fullImage;
-    
     item.innerHTML = `
-        <img src="${thumbnailSrc}" alt="Badge de ${badge.prenom} ${badge.nom}" loading="lazy">
+        <img src="${badge.imageUrl}" alt="Badge de ${badge.prenom} ${badge.nom}" loading="lazy">
         <div class="gallery-item-overlay">
             <p class="gallery-item-name">${badge.prenom} ${badge.nom.toUpperCase()}</p>
             <p class="gallery-item-date">${formattedDate}</p>
@@ -1031,17 +783,15 @@ function createGalleryItem(badge) {
         </div>
     `;
     
-    item.dataset.fullImage = fullImageSrc;
+    item.querySelector('.gallery-item-btn.download').addEventListener('click', (e) => {
+        e.stopPropagation();
+        downloadGalleryBadge(badge);
+    });
     
     item.addEventListener('click', (e) => {
         if (!e.target.closest('.gallery-item-btn')) {
-            openGalleryModal({...badge, fullImage: fullImageSrc});
+            openGalleryModal(badge);
         }
-    });
-    
-    item.querySelector('.gallery-item-btn.download').addEventListener('click', (e) => {
-        e.stopPropagation();
-        downloadGalleryBadge({...badge, fullImage: fullImageSrc});
     });
     
     return item;
@@ -1050,7 +800,7 @@ function createGalleryItem(badge) {
 function downloadGalleryBadge(badge) {
     const filename = `badge_UP_${badge.prenom}_${badge.nom}.png`.replace(/\s+/g, '_');
     const link = document.createElement('a');
-    link.href = badge.fullImage || badge.imageUrl;
+    link.href = badge.imageUrl;
     link.download = filename;
     link.target = '_blank';
     document.body.appendChild(link);
@@ -1067,19 +817,17 @@ function openGalleryModal(badge) {
         document.body.appendChild(modal);
     }
     
-    const date = new Date(badge.date);
+    const date = new Date(badge.createdAt);
     const formattedDate = date.toLocaleDateString('fr-FR', {
         day: '2-digit',
         month: 'long',
         year: 'numeric'
     });
     
-    const fullImageSrc = badge.fullImage || badge.imageUrl;
-    
     modal.innerHTML = `
         <div class="gallery-modal-content">
             <button class="gallery-modal-close">&times;</button>
-            <img src="${fullImageSrc}" alt="Badge de ${badge.prenom} ${badge.nom}">
+            <img src="${badge.imageUrl}" alt="Badge de ${badge.prenom} ${badge.nom}">
             <div class="gallery-modal-info">
                 <h3>${badge.prenom} ${badge.nom.toUpperCase()}</h3>
                 <p>Publié le ${formattedDate}</p>
@@ -1089,67 +837,89 @@ function openGalleryModal(badge) {
     
     modal.classList.add('active');
     
-    modal.querySelector('.gallery-modal-close').addEventListener('click', closeGalleryModal);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeGalleryModal();
-    });
-    
-    document.addEventListener('keydown', handleModalEscape);
-}
-
-function closeGalleryModal() {
-    const modal = document.getElementById('galleryModal');
-    if (modal) {
+    const closeBtn = modal.querySelector('.gallery-modal-close');
+    const closeModal = () => {
         modal.classList.remove('active');
-    }
-    document.removeEventListener('keydown', handleModalEscape);
+    };
+    
+    closeBtn.onclick = closeModal;
+    modal.onclick = (e) => {
+        if (e.target === modal) closeModal();
+    };
 }
 
-function handleModalEscape(e) {
-    if (e.key === 'Escape') {
-        closeGalleryModal();
-    }
-}
+// ==========================================
+// PUBLISH FUNCTIONS
+// ==========================================
 
-// Publish to gallery handler
-async function handlePublishToGallery() {
-    if (!generatedImageBlob) {
-        alert('Veuillez d\'abord générer un badge.');
+let badgePublishedToGallery = false;
+
+async function handlePublish() {
+    if (badgePublishedToGallery) {
+        alert('Votre badge est déjà publié dans la galerie !');
         return;
     }
-    
-    const prenom = prenomInput.value.trim();
-    const nom = nomInput.value.trim();
-    const btn = document.getElementById('publishToGallery');
-    const originalHTML = btn.innerHTML;
-    
-    // Show loading state
-    btn.innerHTML = '<div class="spinner-small"></div><span>Publication...</span>';
-    btn.disabled = true;
-    
-    // Convert blob to data URL for storage
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-        try {
-            await saveBadgeToGallery(reader.result, prenom, nom);
-            
-            // Show success
-            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Publié !</span>';
-            btn.style.background = 'var(--primary-color)';
-            btn.style.color = 'white';
-            
-            setTimeout(() => {
-                btn.innerHTML = originalHTML;
-                btn.style.background = '';
-                btn.style.color = '';
-                btn.disabled = false;
-            }, 2000);
-        } catch (error) {
-            console.error('Error publishing:', error);
-            btn.innerHTML = originalHTML;
-            btn.disabled = false;
-            alert('Erreur lors de la publication. Réessayez.');
+
+    try {
+        showLoading();
+        const blob = await generateBadgeWithAdjustments();
+        
+        if (!blob) {
+            throw new Error('La génération du badge a échoué.');
         }
-    };
-    reader.readAsDataURL(generatedImageBlob);
+
+        await publishToGallery(blob);
+        hideLoading();
+        
+        // Show download/share buttons after successful publish
+        downloadBtn.style.display = 'flex';
+        shareWhatsApp.style.display = 'flex';
+        shareFacebook.style.display = 'flex';
+        
+        // Hide publish button
+        if (publishBtn) publishBtn.style.display = 'none';
+
+        alert('✅ Votre badge a été validé et publié dans la galerie avec succès ! Vous pouvez maintenant le télécharger et le partager.');
+    } catch (error) {
+        hideLoading();
+        console.error('Error publishing badge:', error);
+        alert('Erreur lors de la publication. Veuillez réessayer.');
+    }
+}
+
+function publishToGallery(blob) {
+    return new Promise((resolve, reject) => {
+        if (badgePublishedToGallery) {
+            resolve(true);
+            return;
+        }
+
+        const prenom = prenomInput.value.trim();
+        const nom = nomInput.value.trim();
+        
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            try {
+                await saveBadgeToGallery(reader.result, prenom, nom);
+                badgePublishedToGallery = true;
+                resolve(true);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+// Helper to generate blob with adjustments (reusing existing logic but ensuring it returns blob)
+async function generateBadgeWithAdjustments() {
+    // If we already have a generated blob and no changes were made, return it
+    // But for safety, let's regenerate to be sure we capture latest state
+    
+    // We can reuse the existing generateBadgeImage logic but we need it to return the blob
+    // The existing function sets global variables. Let's modify it or wrap it.
+    
+    await generateBadgeImage();
+    return generatedImageBlob;
 }

@@ -18,4 +18,6 @@ model Badge {
   nom       String
   imageUrl  String   @db.Text
   createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
