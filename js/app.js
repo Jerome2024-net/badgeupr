@@ -705,9 +705,11 @@ async function loadGalleryPreview() {
     // Fetch only 20 badges for preview to be fast
     const badges = await fetchBadges(20);
     
-    // Fetch real-time count
-    const count = await fetchBadgeCount();
-    badgeCounter.textContent = `${count} supporter${count > 1 ? 's' : ''}`;
+    // Initial count update
+    updateBadgeCount();
+    
+    // Start polling for count updates every 10 seconds
+    setInterval(updateBadgeCount, 10000);
     
     // Clear and populate preview
     galleryPreviewScroll.innerHTML = '';
@@ -725,6 +727,17 @@ async function loadGalleryPreview() {
         const item = createPreviewItem(badge);
         galleryPreviewScroll.appendChild(item);
     });
+}
+
+async function updateBadgeCount() {
+    const count = await fetchBadgeCount();
+    // Display both "Supporters" and "Badges générés" as requested
+    badgeCounter.textContent = `${count} Supporters | ${count} Badges générés`;
+    
+    // Also update the full gallery count if it's open
+    if (galleryBadgeCount) {
+        galleryBadgeCount.textContent = `${count} badge${count > 1 ? 's' : ''}`;
+    }
 }
 
 function createPreviewItem(badge) {
