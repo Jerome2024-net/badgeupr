@@ -596,7 +596,8 @@ async function uploadToCloudinary(imageDataUrl) {
         
         formData.append('file', blob);
         formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-        formData.append('folder', 'badges_up_renouveau');
+        // Removed folder parameter to avoid permission issues with unsigned presets
+        // formData.append('folder', 'badges_up_renouveau');
         
         const uploadResponse = await fetch(
             `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
@@ -608,10 +609,17 @@ async function uploadToCloudinary(imageDataUrl) {
         
         if (uploadResponse.ok) {
             const data = await uploadResponse.json();
+            console.log('Cloudinary upload success:', data);
             return data.secure_url;
         }
         const errorData = await uploadResponse.json();
         console.error('Cloudinary error:', errorData);
+        
+        // Check for common errors
+        if (errorData.error?.message?.includes('unsigned')) {
+            throw new Error('Configuration Cloudinary incorrecte : Le "Upload Preset" doit être en mode "Unsigned".');
+        }
+        
         throw new Error(errorData.error?.message || 'Upload failed');
     } catch (error) {
         console.error('Cloudinary upload error:', error);
