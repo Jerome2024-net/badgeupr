@@ -53,6 +53,7 @@ let currentX = 0;
 let currentY = 0;
 let isDragging = false;
 let startX, startY;
+let badgePublishedToGallery = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', init);
@@ -389,6 +390,9 @@ function resetForm() {
     generatedImageBlob = null;
     generatedImageUrl = null;
     
+    // Reset publish state
+    badgePublishedToGallery = false;
+    
     // Show form, hide badge
     formSection.style.display = '';
     badgeSection.style.display = 'none';
@@ -571,6 +575,7 @@ async function fetchBadges(limit = 50) {
                     id: key,
                     ...data[key]
                 }))
+                .filter(item => item.imageUrl && !item.imageUrl.startsWith('data:')) // Filter out base64 images
                 .reverse();
         }
         return [];
@@ -620,7 +625,9 @@ async function saveBadgeToGallery(imageDataUrl, prenom, nom) {
         
         // 2. Upload to Cloudinary
         const cloudinaryUrl = await uploadToCloudinary(compressedImage);
-        if (!cloudinaryUrl) throw new Error('Cloudinary upload failed');
+        if (!cloudinaryUrl || cloudinaryUrl.startsWith('data:')) {
+            throw new Error('Cloudinary upload failed or returned invalid URL');
+        }
         
         // 3. Save to Firebase
         const response = await fetch(`${FIREBASE_DB_URL}/badges.json`, {
@@ -673,6 +680,22 @@ function compressImage(dataUrl, maxWidth = 540, quality = 0.7) {
     });
 }
 
+// Fetch badge count
+async function fetchBadgeCount() {
+    try {
+        const response = await fetch(`${FIREBASE_DB_URL}/badges.json?shallow=true`);
+        if (response.ok) {
+            const data = await response.json();
+            if (!data) return 0;
+            return Object.keys(data).length;
+        }
+        return 0;
+    } catch (error) {
+        console.error('Error fetching count:', error);
+        return 0;
+    }
+}
+
 // ==========================================
 // GALLERY UI FUNCTIONS
 // ==========================================
@@ -682,12 +705,9 @@ async function loadGalleryPreview() {
     // Fetch only 20 badges for preview to be fast
     const badges = await fetchBadges(20);
     
-    // Update counter (approximate or just show "Many")
-    // Note: We can't get the total count easily without fetching all keys, 
-    // so we'll just show "Supporters" or keep the count of fetched items for now.
-    // Or we can fetch a separate counter if available.
-    // For now, let's just show "Derniers supporters"
-    badgeCounter.textContent = `Derniers supporters`;
+    // Fetch real-time count
+    const count = await fetchBadgeCount();
+    badgeCounter.textContent = `${count} supporter${count > 1 ? 's' : ''}`;
     
     // Clear and populate preview
     galleryPreviewScroll.innerHTML = '';
@@ -744,9 +764,10 @@ async function loadFullGallery() {
     
     // Fetch up to 5000 badges to ensure we get all 2000+
     const badges = await fetchBadges(5000);
+    const count = await fetchBadgeCount();
     
     galleryLoading.classList.add('hidden');
-    galleryBadgeCount.textContent = `${badges.length} badge${badges.length > 1 ? 's' : ''}`;
+    galleryBadgeCount.textContent = `${count} badge${count > 1 ? 's' : ''}`;
     
     if (badges.length === 0) {
         galleryEmpty.classList.add('visible');
@@ -876,9 +897,8 @@ function openGalleryModal(badge) {
 // PUBLISH FUNCTIONS
 // ==========================================
 
-let badgePublishedToGallery = false;
-
 async function handlePublish() {
+    console.log('handlePublish called');
     if (badgePublishedToGallery) {
         alert('Votre badge est déjà publié dans la galerie !');
         return;
@@ -886,13 +906,17 @@ async function handlePublish() {
 
     try {
         showLoading();
+        console.log('Generating badge for publish...');
         const blob = await generateBadgeWithAdjustments();
+        console.log('Badge generated, blob size:', blob ? blob.size : 'null');
         
         if (!blob) {
             throw new Error('La génération du badge a échoué.');
         }
 
+        console.log('Publishing to gallery...');
         await publishToGallery(blob);
+        console.log('Published successfully');
         hideLoading();
         
         // Show download/share buttons after successful publish
@@ -907,7 +931,7 @@ async function handlePublish() {
     } catch (error) {
         hideLoading();
         console.error('Error publishing badge:', error);
-        alert('Erreur lors de la publication. Veuillez réessayer.');
+        alert('Erreur lors de la publication. Veuillez réessayer. Détails: ' + error.message);
     }
 }
 
@@ -938,12 +962,19 @@ function publishToGallery(blob) {
 
 // Helper to generate blob with adjustments (reusing existing logic but ensuring it returns blob)
 async function generateBadgeWithAdjustments() {
+    console.log('generateBadgeWithAdjustments called');
     // If we already have a generated blob and no changes were made, return it
     // But for safety, let's regenerate to be sure we capture latest state
     
     // We can reuse the existing generateBadgeImage logic but we need it to return the blob
     // The existing function sets global variables. Let's modify it or wrap it.
     
-    await generateBadgeImage();
-    return generatedImageBlob;
+    try {
+        const blob = await generateBadgeImage();
+        console.log('generateBadgeImage returned blob:', blob);
+        return blob;
+    } catch (e) {
+        console.error('Error in generateBadgeWithAdjustments:', e);
+        return null;
+    }
 }
