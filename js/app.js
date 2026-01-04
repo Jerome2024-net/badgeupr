@@ -610,10 +610,12 @@ async function uploadToCloudinary(imageDataUrl) {
             const data = await uploadResponse.json();
             return data.secure_url;
         }
-        throw new Error('Upload failed');
+        const errorData = await uploadResponse.json();
+        console.error('Cloudinary error:', errorData);
+        throw new Error(errorData.error?.message || 'Upload failed');
     } catch (error) {
         console.error('Cloudinary upload error:', error);
-        return null;
+        throw error;
     }
 }
 
@@ -624,12 +626,20 @@ async function saveBadgeToGallery(imageDataUrl, prenom, nom) {
         const compressedImage = await compressImage(imageDataUrl, 720, 0.85);
         
         // 2. Upload to Cloudinary
-        const cloudinaryUrl = await uploadToCloudinary(compressedImage);
+        console.log('Uploading to Cloudinary...');
+        let cloudinaryUrl;
+        try {
+            cloudinaryUrl = await uploadToCloudinary(compressedImage);
+        } catch (e) {
+            throw new Error('Erreur Cloudinary: ' + e.message);
+        }
+
         if (!cloudinaryUrl || cloudinaryUrl.startsWith('data:')) {
             throw new Error('Cloudinary upload failed or returned invalid URL');
         }
         
         // 3. Save to Firebase
+        console.log('Saving to Firebase...');
         const response = await fetch(`${FIREBASE_DB_URL}/badges.json`, {
             method: 'POST',
             headers: {
@@ -944,7 +954,7 @@ async function handlePublish() {
     } catch (error) {
         hideLoading();
         console.error('Error publishing badge:', error);
-        alert('Erreur lors de la publication. Veuillez réessayer. Détails: ' + error.message);
+        alert('Erreur lors de la publication: ' + error.message);
     }
 }
 
