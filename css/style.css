@@ -291,7 +291,7 @@ body {
     height: 100%;
     z-index: 2;
     pointer-events: none;
-    object-fit: contain;
+    object-fit: fill;
 }
 
 /* ZONE 3 : Texte dynamique (Nom) */
