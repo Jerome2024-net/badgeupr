@@ -297,7 +297,7 @@ body {
 /* ZONE 3 : Texte dynamique (Nom) */
 .badge-text-overlay {
     position: absolute;
-    bottom: 25%; /* Position intermédiaire : compromis entre 22% (trop bas) et 28% (trop haut) */
+    bottom: 23.5%; /* Ajustement de précision : entre 22% et 25% */
     left: 0;
     width: 100%;
     text-align: center;
