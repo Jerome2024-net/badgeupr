@@ -793,8 +793,8 @@ async function loadFullGallery() {
     galleryLoading.classList.remove('hidden');
     galleryEmpty.classList.remove('visible');
     
-    // Fetch up to 5000 badges to ensure we get all 2000+
-    const badges = await fetchBadges(5000);
+    // Fetch up to 100000 badges as requested
+    const badges = await fetchBadges(100000);
     const count = await fetchBadgeCount();
     
     galleryLoading.classList.add('hidden');
