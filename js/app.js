@@ -262,7 +262,7 @@ async function generateBadgeImage() {
                 }
                 generatedImageUrl = URL.createObjectURL(blob);
                 resolve(blob);
-            }, 'image/png', 1.0);
+            }, 'image/jpeg', 0.8);
         });
         
     } catch (error) {
