@@ -239,9 +239,9 @@ async function handleFormSubmit(e) {
 // Generate badge image using html2canvas - 1080x1080px HD
 async function generateBadgeImage() {
     try {
-        // Calculate scale to get 1080px output
+        // Calculate scale to get 800px output (Optimized for speed)
         const badgeWidth = badge.offsetWidth;
-        const targetSize = 1080;
+        const targetSize = 800;
         const scale = targetSize / badgeWidth;
         
         const canvas = await html2canvas(badge, {
