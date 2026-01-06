@@ -197,7 +197,19 @@ async function handleFormSubmit(e) {
     badgeSection.style.display = 'block';
 
     // Update badge content
-    badgeName.textContent = `${prenom} ${nom.toUpperCase()}`;
+    const fullName = `${prenom} ${nom.toUpperCase()}`;
+    badgeName.textContent = fullName;
+
+    // Dynamic font size adjustment
+    const textElement = document.querySelector('.badge-dynamic-text');
+    if (fullName.length > 25) {
+        textElement.style.fontSize = '0.6rem';
+    } else if (fullName.length > 18) {
+        textElement.style.fontSize = '0.7rem';
+    } else {
+        textElement.style.fontSize = '0.8rem';
+    }
+
     badgePhoto.src = photoSrc;
     
     // Reset adjustments
