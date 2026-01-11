@@ -24,36 +24,20 @@
             <p class="subtitle">Créez votre badge de campagne</p>
         </header>
 
-        <!-- Form Section -->
-        <section class="form-section">
-            <form id="badgeForm">
-                <div class="form-group">
-                    <label for="prenom">Prénom</label>
-                    <input type="text" id="prenom" name="prenom" placeholder="Entrez votre prénom" required>
-                </div>
-                <div class="form-group">
-                    <label for="nom">Nom</label>
-                    <input type="text" id="nom" name="nom" placeholder="Entrez votre nom" required>
-                </div>
-                <div class="form-group">
-                    <label for="photo">Votre photo</label>
-                    <div class="photo-upload" id="photoUpload">
-                        <input type="file" id="photo" name="photo" accept="image/*" hidden>
-                        <div class="upload-placeholder" id="uploadPlaceholder">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                <polyline points="21 15 16 10 5 21"></polyline>
-                            </svg>
-                            <span>Cliquez pour ajouter une photo</span>
-                        </div>
-                        <img src="" alt="Preview" class="photo-preview" id="photoPreview">
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary" id="generateBtn">
-                    <span>Générer mon badge</span>
-                </button>
-            </form>
+        <!-- End of Campaign Message -->
+        <section class="form-section" style="text-align: center; padding: 3rem 1.5rem;">
+            <div style="margin-bottom: 2rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+            </div>
+            <h2 style="color: var(--primary-color); margin-bottom: 1rem; font-size: 1.5rem;">La campagne est terminée</h2>
+            <p style="font-size: 1.1rem; color: var(--text-dark); margin-bottom: 2rem;">
+                Merci à tous pour votre soutien incroyable et votre mobilisation durant cette campagne.
+                <br><br>
+                Ensemble, nous avons maintenu le CAP !
+            </p>
         </section>
 
         <!-- Badge Preview Section -->
@@ -122,26 +106,7 @@
             </button>
         </section>
 
-        <!-- Gallery Preview Section - Toujours visible -->
-        <section class="gallery-preview" id="galleryPreview">
-            <div class="gallery-preview-header">
-                <h2>🌟 Ils soutiennent UP – Le Renouveau</h2>
-                <span class="badge-counter" id="badgeCounter">0 supporters</span>
-            </div>
-            <div class="gallery-preview-scroll" id="galleryPreviewScroll">
-                <div class="gallery-preview-empty" id="galleryPreviewEmpty">
-                    <p>🎉 Soyez le premier à créer et publier votre badge !</p>
-                </div>
-                <!-- Badges en scroll horizontal -->
-            </div>
-            <button class="btn btn-see-all" id="seeAllBadgesBtn">
-                Voir tous les badges
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                    <polyline points="12 5 19 12 12 19"></polyline>
-                </svg>
-            </button>
-        </section>
+
 
         <!-- Full Gallery Section (hidden by default) -->
         <section class="gallery-full" id="galleryFull">

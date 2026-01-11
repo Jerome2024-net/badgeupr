@@ -222,6 +222,7 @@ body {
 
 /* Badge Section */
 .badge-section {
+    display: none !important;
     background: var(--card-bg);
     border-radius: var(--radius);
     padding: 1.5rem;

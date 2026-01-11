@@ -66,27 +66,37 @@ function init() {
 
 function setupEventListeners() {
     // Photo upload click handler
-    photoUpload.addEventListener('click', (e) => {
-        if (e.target !== photoInput) {
-            photoInput.click();
-        }
-    });
+    if (photoUpload) {
+        photoUpload.addEventListener('click', (e) => {
+            if (e.target !== photoInput) {
+                photoInput.click();
+            }
+        });
+    }
     
     // Photo input change handler
-    photoInput.addEventListener('change', handlePhotoSelect);
+    if (photoInput) {
+        photoInput.addEventListener('change', handlePhotoSelect);
+    }
     
     // Form submission
-    badgeForm.addEventListener('submit', handleFormSubmit);
+    if (badgeForm) {
+        badgeForm.addEventListener('submit', handleFormSubmit);
+    }
     
     // Download button
-    downloadBtn.addEventListener('click', handleDownload);
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', handleDownload);
+    }
     
     // Share buttons
-    shareWhatsApp.addEventListener('click', handleWhatsAppShare);
-    shareFacebook.addEventListener('click', handleFacebookShare);
+    if (shareWhatsApp) shareWhatsApp.addEventListener('click', handleWhatsAppShare);
+    if (shareFacebook) shareFacebook.addEventListener('click', handleFacebookShare);
     
     // New badge button
-    newBadgeBtn.addEventListener('click', resetForm);
+    if (newBadgeBtn) {
+        newBadgeBtn.addEventListener('click', resetForm);
+    }
     
     // Publish button
     if (publishBtn) {
@@ -94,8 +104,8 @@ function setupEventListeners() {
     }
 
     // Gallery events
-    seeAllBadgesBtn.addEventListener('click', openFullGallery);
-    closeGalleryBtn.addEventListener('click', closeFullGallery);
+    if (seeAllBadgesBtn) seeAllBadgesBtn.addEventListener('click', openFullGallery);
+    if (closeGalleryBtn) closeGalleryBtn.addEventListener('click', closeFullGallery);
 
     // Drag and drop support
     photoUpload.addEventListener('dragover', handleDragOver);
@@ -742,21 +752,27 @@ async function loadGalleryPreview() {
     setInterval(updateBadgeCount, 10000);
     
     // Clear and populate preview
-    galleryPreviewScroll.innerHTML = '';
-    
-    if (badges.length === 0) {
-        galleryPreviewScroll.appendChild(galleryPreviewEmpty);
-        galleryPreviewEmpty.classList.remove('hidden');
-        return;
+    if (galleryPreviewScroll) {
+        galleryPreviewScroll.innerHTML = '';
+        
+        if (badges.length === 0) {
+            if (galleryPreviewEmpty) {
+                galleryPreviewScroll.appendChild(galleryPreviewEmpty);
+                galleryPreviewEmpty.classList.remove('hidden');
+            }
+            return;
+        }
+        
+        if (galleryPreviewEmpty) {
+            galleryPreviewEmpty.classList.add('hidden');
+        }
+        
+        // Show badges
+        badges.forEach(badge => {
+            const item = createPreviewItem(badge);
+            galleryPreviewScroll.appendChild(item);
+        });
     }
-    
-    galleryPreviewEmpty.classList.add('hidden');
-    
-    // Show badges
-    badges.forEach(badge => {
-        const item = createPreviewItem(badge);
-        galleryPreviewScroll.appendChild(item);
-    });
 }
 
 async function updateBadgeCount() {
