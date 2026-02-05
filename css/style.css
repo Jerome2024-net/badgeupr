@@ -70,12 +70,12 @@ body {
 }
 
 .logo {
-    width: 70px; /* Taille réduite de 100px à 70px */
-    height: 70px;
+    width: 120px;
+    height: 120px;
     object-fit: contain;
     border-radius: 50%;
     background: var(--text-light);
-    padding: 0.4rem;
+    padding: 0.5rem;
     box-shadow: var(--shadow-lg);
 }
 
