@@ -578,18 +578,31 @@ function fitImageToZone() {
 // API & CLOUDINARY FUNCTIONS
 // ==========================================
 
-// Fetch badges from API
+// Firebase Configuration
+const FIREBASE_DB_URL = 'https://up-le-renouveau-default-rtdb.europe-west1.firebasedatabase.app';
+
+// Fetch badges from Firebase (Optimized)
 async function fetchBadges(limit = 50) {
     try {
-        const response = await fetch(`/api/badges?limit=${limit}`);
+        // Fetch badges with dynamic limit
+        const response = await fetch(`${FIREBASE_DB_URL}/badges.json?orderBy="$key"&limitToLast=${limit}`);
         
         if (response.ok) {
             const data = await response.json();
-            return data;
+            if (!data) return [];
+            
+            // Convert object to array and reverse (newest first)
+            return Object.keys(data)
+                .map(key => ({
+                    id: key,
+                    ...data[key]
+                }))
+                .filter(item => item.imageUrl && !item.imageUrl.startsWith('data:')) // Filter out base64 images
+                .reverse();
         }
         return [];
     } catch (error) {
-        console.error('Error fetching badges from API:', error);
+        console.error('Error fetching badges:', error);
         return [];
     }
 }
@@ -636,7 +649,7 @@ async function uploadToCloudinary(imageDataUrl) {
     }
 }
 
-// Save badge to API
+// Save badge to Firebase
 async function saveBadgeToGallery(imageDataUrl, prenom, nom) {
     try {
         // 1. Compress image for storage (720px, 85% quality)
@@ -655,9 +668,9 @@ async function saveBadgeToGallery(imageDataUrl, prenom, nom) {
             throw new Error('Cloudinary upload failed or returned invalid URL');
         }
         
-        // 3. Save to API
-        console.log('Saving to API...');
-        const response = await fetch('/api/badges', {
+        // 3. Save to Firebase
+        console.log('Saving to Firebase...');
+        const response = await fetch(`${FIREBASE_DB_URL}/badges.json`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -665,11 +678,12 @@ async function saveBadgeToGallery(imageDataUrl, prenom, nom) {
             body: JSON.stringify({
                 prenom,
                 nom,
-                imageUrl: cloudinaryUrl
+                imageUrl: cloudinaryUrl,
+                createdAt: new Date().toISOString()
             })
         });
         
-        if (!response.ok) throw new Error('API save failed');
+        if (!response.ok) throw new Error('Firebase save failed');
         
         // Refresh gallery
         loadGalleryPreview();
@@ -709,15 +723,13 @@ function compressImage(dataUrl, maxWidth = 540, quality = 0.7) {
 // Fetch badge count
 async function fetchBadgeCount() {
     try {
-        const response = await fetch('/api/badges?limit=1'); 
-        // Note: Ideally, we should have an endpoint specifically for counting.
-        // For now, we'll try to rely on the array length in other places, 
-        // or just accept we lack a proper count endpoint. 
-        // If we strictly follow the API provided in `api/badges.js`, it returns an array.
-        // We can't query "count" easily without fetching all or adding a new endpoint.
-        // Let's assume fetching badges is enough to populate the gallery.
-        // To avoid breaking things, we'll just return 0 here or implement a real count later if needed.
-        return 0; 
+        const response = await fetch(`${FIREBASE_DB_URL}/badges.json?shallow=true`);
+        if (response.ok) {
+            const data = await response.json();
+            if (!data) return 0;
+            return Object.keys(data).length;
+        }
+        return 0;
     } catch (error) {
         console.error('Error fetching count:', error);
         return 0;
@@ -743,6 +755,11 @@ async function loadGalleryPreview() {
     if (galleryPreviewScroll) {
         galleryPreviewScroll.innerHTML = '';
         
+        // Show gallery section if we have badges
+        if (galleryPreview) {
+             galleryPreview.style.display = badges.length > 0 ? 'block' : 'none';
+        }
+
         if (badges.length === 0) {
             if (galleryPreviewEmpty) {
                 galleryPreviewScroll.appendChild(galleryPreviewEmpty);
